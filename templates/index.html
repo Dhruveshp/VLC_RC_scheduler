@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Music Scheduler</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </head>
 <body>
 <div class="container mt-5">
@@ -16,11 +19,11 @@
         </div>
         <div class="form-group">
             <label for="start_time">Start Time (HH:MM):</label>
-            <input type="time" class="form-control form-control-sm" name="start_time" required>
+            <input type="time" class="form-control" name="start_time" required>
         </div>
         <div class="form-group">
             <label for="end_time">End Time (HH:MM):</label>
-            <input type="time" class="form-control form-control-sm" name="end_time">
+            <input type="time" class="form-control" name="end_time">
         </div>
         <div class="form-group">
             <label for="days">Select Days:</label><br>
@@ -55,6 +58,7 @@
         </div>
         <button type="submit" class="btn btn-primary">Add Schedule</button>
     </form>
+    
     <h2 class="mt-5">Scheduled Music</h2>
     <div class="table-responsive">
         <table class="table">
@@ -78,6 +82,12 @@
                     <td>{{ schedule.days }}</td>
                     <td>
                         <a href="/stop_schedule/{{ schedule.id }}" class="btn btn-danger">Stop</a>
+                        <button class="btn btn-warning" data-toggle="modal" data-target="#editModal" 
+                                data-id="{{ schedule.id }}" 
+                                data-music-folder="{{ schedule.play_music_folder }}" 
+                                data-start-time="{{ schedule.start_time }}" 
+                                data-end-time="{{ schedule.end_time }}" 
+                                data-days="{{ schedule.days }}">Edit</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -85,5 +95,75 @@
         </table>
     </div>
 </div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">Edit Schedule</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="editScheduleForm" action="/edit_schedule" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="scheduleId">
+                    <div class="form-group">
+                        <label for="play_music_folder">Music Folder:</label>
+                        <input type="text" class="form-control" name="play_music_folder" id="editMusicFolder" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="start_time">Start Time (HH:MM):</label>
+                        <input type="time" class="form-control" name="start_time" id="editStartTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="end_time">End Time (HH:MM):</label>
+                        <input type="time" class="form-control" name="end_time" id="editEndTime">
+                    </div>
+                    <div class="form-group">
+                        <label for="days">Select Days:</label><br>
+                        <div id="editDaysCheckboxes"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#editModal').on('show.bs.modal', function(event) {
+            var button = $(event.relatedTarget);
+            var scheduleId = button.data('id');
+            var musicFolder = button.data('music-folder');
+            var startTime = button.data('start-time');
+            var endTime = button.data('end-time');
+            var days = button.data('days').split(',');
+
+            $('#scheduleId').val(scheduleId);
+            $('#editMusicFolder').val(musicFolder);
+            $('#editStartTime').val(startTime);
+            $('#editEndTime').val(endTime);
+
+            // Populate the checkbox for days
+            var daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            var checkboxesHtml = '';
+            daysOfWeek.forEach(function(day) {
+                var checked = days.includes(day) ? 'checked' : '';
+                checkboxesHtml += `<div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="days" value="${day}" ${checked}>
+                    <label class="form-check-label">${day}</label>
+                </div>`;
+            });
+            $('#editDaysCheckboxes').html(checkboxesHtml);
+        });
+    });
+</script>
+
 </body>
 </html>

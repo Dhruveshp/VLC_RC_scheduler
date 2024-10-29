@@ -264,10 +264,14 @@ def index():
 @app.route('/add_schedule', methods=['POST'])
 def add_schedule():
     """Add a new schedule to the database."""
-    play_music_folder = request.form['play_music_folder']
-    start_time = request.form['start_time']
-    end_time = request.form['end_time']
+    play_music_folder = request.form.get('play_music_folder')  # Use .get() to avoid KeyError
+    start_time = request.form.get('start_time')
+    end_time = request.form.get('end_time')
     days = request.form.getlist('days')
+
+    if not play_music_folder or not start_time:  # Validate the essential fields
+        logging.error("Missing required fields.")
+        return redirect(url_for('index'))
 
     # Join the list of days into a comma-separated string
     days_str = ','.join(days)
@@ -276,30 +280,56 @@ def add_schedule():
         play_music_folder=play_music_folder,
         start_time=start_time,
         end_time=end_time,
-        days=days_str  # Store the joined string in the database
+        days=days_str
     )
-    
+
     db.session.add(new_schedule)
     db.session.commit()
     logging.info(f"Added new schedule: {play_music_folder}, Start: {start_time}, End: {end_time}, Days: {days_str}")
 
-    # Re-schedule jobs after adding a new schedule
-    scheduler.add_job(schedule_music, 'cron', 
-                      day_of_week=convert_days_to_ap_scheduler_format(days),
-                      hour=int(start_time.split(":")[0]), 
-                      minute=int(start_time.split(":")[1]), 
-                      args=[{
-                          'id': new_schedule.id,
-                          'play_music_folder': play_music_folder,
-                          'start_time': start_time,
-                          'end_time': end_time,
-                          'days': days
-                      }],
-                      id=f"{start_time}_{days_str.replace(',', '_')}")  # Unique ID based on time and days
-
     return redirect(url_for('index'))
 
 
+@app.route('/edit_schedule', methods=['POST'])
+def edit_schedule():
+    """Edit an existing schedule in the database."""
+    schedule_id = request.form['id']
+    play_music_folder = request.form['play_music_folder']
+    start_time = request.form['start_time']
+    end_time = request.form['end_time']
+    days = request.form.getlist('days')
+    
+    # Find the schedule by ID and update its fields
+    schedule = Schedule.query.get(schedule_id)
+    if schedule:
+        schedule.play_music_folder = play_music_folder
+        schedule.start_time = start_time
+        schedule.end_time = end_time
+        schedule.days = ','.join(days)
+        
+        db.session.commit()
+        logging.info(f"Updated schedule ID: {schedule_id} with new values.")
+
+        # Re-schedule jobs after editing
+        scheduler.remove_job(f"{schedule.start_time}_{schedule.days.replace(',', '_')}")
+        scheduler.add_job(schedule_music, 'cron', 
+                          day_of_week=convert_days_to_ap_scheduler_format(days),
+                          hour=int(start_time.split(":")[0]), 
+                          minute=int(start_time.split(":")[1]), 
+                          args=[{
+                              'id': schedule.id,
+                              'play_music_folder': play_music_folder,
+                              'start_time': start_time,
+                              'end_time': end_time,
+                              'days': days
+                          }],
+                          id=f"{start_time}_{','.join(days).replace(',', '_')}")  # Unique ID based on time and days
+
+        return redirect(url_for('index'))
+    else:
+        logging.warning(f"Schedule ID not found: {schedule_id}")
+        return redirect(url_for('index'))
+    
 @app.route('/stop_schedule/<int:schedule_id>')
 def stop_schedule(schedule_id):
     """Stop a scheduled music playback by schedule ID."""
@@ -314,6 +344,7 @@ def stop_schedule(schedule_id):
         logging.warning(f"Schedule ID not found: {schedule_id}")
 
     return redirect(url_for('index'))
+
 
 if __name__ == '__main__':
     main()
