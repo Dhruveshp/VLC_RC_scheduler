@@ -119,38 +119,6 @@ def normalize_path(path):
     """Normalize the path to use the correct separators."""
     return os.path.normpath(path)
 
-def play_music(music_folder):
-    """Select and play a random music file from the specified folder."""
-    music_folder = normalize_path(music_folder)
-    music_files = [f for f in glob.glob(os.path.join(music_folder, '*')) if f.endswith(('.mp3', '.wav'))]
-
-    if not music_files:
-        logging.warning(f"No music files found in {music_folder}")
-        return
-
-    music_to_play = random.choice(music_files)
-    logging.info(f"Now playing: {music_to_play}")
-
-    if not os.path.isfile(music_to_play):
-        logging.error(f"File does not exist: {music_to_play}")
-        return
-
-    if not vlc.is_vlc_running():
-        vlc.start_vlc(media_path=music_to_play)
-    else:
-        vlc.add_to_playlist(music_to_play)
-
-    time.sleep(2)  # Wait for VLC to get ready
-
-    if vlc.sock:
-        try:
-            vlc.play()
-            vlc.set_volume(100)
-            logging.info("Playback started successfully.")
-        except Exception as e:
-            logging.error(f"Error during playback: {e}")
-    else:
-        logging.error("VLC is not connected. Cannot send play command.")
 
 def stop_music():
     """Stop the music playback."""
@@ -186,6 +154,17 @@ def load_schedules_from_db():
         for schedule in schedules
     ]
 
+def play_music(media_folder):
+    """Play music from the specified folder."""
+    media_files = glob.glob(os.path.join(media_folder, '*'))
+    if media_files:
+        selected_media = random.choice(media_files)
+        vlc.add_to_playlist(selected_media)
+        vlc.play()
+        logging.info(f"Playing music: {selected_media}")
+    else:
+        logging.warning(f"No media files found in folder: {media_folder}")
+
 def schedule_music(job):
     """Schedule music playback based on the provided job details."""
     current_day = datetime.now().strftime("%A")
@@ -194,20 +173,18 @@ def schedule_music(job):
     if current_day in job['days']:
         logging.info(f"Scheduling music for {current_day}")
         play_music(job['play_music_folder'])
-        
+
         if job['end_time']:
-            # Parse end_time correctly
             end_time_str = job['end_time'].split('.')[0]  # Take only 'HH:MM:SS'
-            #end_time = datetime.strptime(end_time_str, '%H:%M:%S').time()
             end_time = datetime.strptime(end_time_str, '%H:%M').time()
             current_time = datetime.now().time()
-            
+
             if current_time < end_time:
                 days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
                 if days_for_scheduler:
-                    scheduler.add_job(stop_music, 'cron', 
-                                      day_of_week=days_for_scheduler, 
-                                      hour=end_time.hour, 
+                    scheduler.add_job(stop_music, 'cron',
+                                      day_of_week=days_for_scheduler,
+                                      hour=end_time.hour,
                                       minute=end_time.minute,
                                       id=f"stop_{job['start_time']}_{'_'.join(job['days'])}")
                 else:
