@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Music Scheduler</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </head>
@@ -14,6 +14,7 @@
     <h1 class="text-center">Music Scheduler</h1>
     
     <button class="btn btn-success mb-4" data-toggle="modal" data-target="#addModal">Add New Schedule</button>
+    <button class="btn btn-info mb-4" data-toggle="modal" data-target="#devicesModal">Smart Switches</button>
     
     <h2 class="mt-5">Scheduled Music</h2>
     <div class="table-responsive">
@@ -156,6 +157,32 @@
     </div>
 </div>
 
+<!-- Devices Modal -->
+<div class="modal fade" id="devicesModal" tabindex="-1" role="dialog" aria-labelledby="devicesModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="devicesModalLabel">Devices</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="all_devices">
+                    {% for index in range %}
+                        <h2>Device {{ index + 1 }}</h2>
+                        <button class="btn btn-primary turn-on" data-index="{{ index }}">Turn On</button>
+                        <button class="btn btn-secondary turn-off" data-index="{{ index }}">Turn Off</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     $(document).ready(function() {
         $('#editModal').on('show.bs.modal', function(event) {
@@ -182,6 +209,38 @@
                 </div>`;
             });
             $('#editDaysCheckboxes').html(checkboxesHtml);
+        });
+
+        // Handle turn on button click
+        $('.turn-on').on('click', function(event) {
+            event.preventDefault(); // Prevent default behavior
+            var index = $(this).data('index');
+            $.ajax({
+                url: '/turn_on/' + index,
+                method: 'GET',
+                success: function(response) {
+                    // Success action can be handled here, e.g., update UI
+                },
+                error: function() {
+                    // Error handling can be done here
+                }
+            });
+        });
+
+        // Handle turn off button click
+        $('.turn-off').on('click', function(event) {
+            event.preventDefault(); // Prevent default behavior
+            var index = $(this).data('index');
+            $.ajax({
+                url: '/turn_off/' + index,
+                method: 'GET',
+                success: function(response) {
+                    // Success action can be handled here, e.g., update UI
+                },
+                error: function() {
+                    // Error handling can be done here
+                }
+            });
         });
     });
 </script>

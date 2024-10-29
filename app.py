@@ -10,6 +10,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from flask import Flask, request, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+import tinytuya
+import json
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,6 +22,42 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schedules.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+
+# Load device configuration from JSON file
+def load_device_config():
+    with open(r'C:\Users\admin\OneDrive - DePaul University\OOP\Desktop(1)\Python\python\Project\flask\RC control way\config.json', 'r') as file:
+        return json.load(file)
+
+# Initialize devices from configuration
+device_config = load_device_config()
+devices = []
+
+for device in device_config['devices']:
+    d = tinytuya.OutletDevice(
+        dev_id=device['dev_id'],
+        address=device['address'],
+        local_key=device['local_key'],
+        version=device['version']  # Use the version from the config
+    )
+    devices.append(d)
+
+
+# Routes for controlling the TinyTuya devices
+@app.route('/turn_on/<int:device_index>')
+def turn_on(device_index):
+    """Turn on the specified device."""
+    devices[device_index].turn_on()
+    return redirect(url_for('index'))
+
+@app.route('/turn_off/<int:device_index>')
+def turn_off(device_index):
+    """Turn off the specified device."""
+    devices[device_index].turn_off()
+    return redirect(url_for('index'))
+
+
+
 
 # Define the Schedule model
 class Schedule(db.Model):
@@ -156,6 +195,9 @@ def load_schedules_from_db():
 
 def play_music(media_folder):
     """Play music from the specified folder."""
+    if not vlc.is_vlc_running():
+        vlc.start_vlc()
+
     media_files = glob.glob(os.path.join(media_folder, '*'))
     if media_files:
         selected_media = random.choice(media_files)
@@ -182,13 +224,19 @@ def schedule_music(job):
             if current_time < end_time:
                 days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
                 if days_for_scheduler:
-                    scheduler.add_job(stop_music, 'cron',
-                                      day_of_week=days_for_scheduler,
-                                      hour=end_time.hour,
-                                      minute=end_time.minute,
-                                      id=f"stop_{job['start_time']}_{'_'.join(job['days'])}")
+                    stop_job_id = f"stop_{job['start_time']}_{'_'.join(job['days'])}"
+                    # Ensure the stop job is not already scheduled
+                    if not scheduler.get_job(stop_job_id):
+                        scheduler.add_job(stop_music, 'cron',
+                                          day_of_week=days_for_scheduler,
+                                          hour=end_time.hour,
+                                          minute=end_time.minute,
+                                          id=stop_job_id)
+                    else:
+                        logging.warning(f"Stop job {stop_job_id} is already scheduled.")
                 else:
                     logging.warning("No valid days to schedule stop_music job.")
+
 
 def main():
     """Main entry point of the application."""
@@ -236,7 +284,7 @@ def main():
 def index():
     """Render the main page with scheduled music."""
     schedules = load_schedules_from_db()
-    return render_template('index.html', schedules=schedules)
+    return render_template('index.html', schedules=schedules,devices=devices, range=range(len(devices)))
 
 @app.route('/add_schedule', methods=['POST'])
 def add_schedule():
