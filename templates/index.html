@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Scheduler</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-5">
+    <h1>Music Scheduler</h1>
+    <form action="/add_schedule" method="POST">
+        <div class="form-group">
+            <label for="play_music_folder">Music Folder:</label>
+            <input type="text" class="form-control" name="play_music_folder" required>
+        </div>
+        <div class="form-group">
+            <label for="start_time">Start Time (HH:MM):</label>
+            <input type="time" class="form-control" name="start_time" required>
+        </div>
+        <div class="form-group">
+            <label for="end_time">End Time (HH:MM):</label>
+            <input type="time" class="form-control" name="end_time">
+        </div>
+        <div class="form-group">
+            <label for="days">Days (comma-separated):</label>
+            <input type="text" class="form-control" name="days" placeholder="Monday,Tuesday,Wednesday" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Schedule</button>
+    </form>
+    <h2 class="mt-5">Scheduled Music</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Music Folder</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Days</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for schedule in schedules %}
+            <tr>
+                <td>{{ schedule.id }}</td>
+                <td>{{ schedule.play_music_folder }}</td>
+                <td>{{ schedule.start_time }}</td>
+                <td>{{ schedule.end_time }}</td>
+                <td>{{ schedule.days }}</td>
+                <td>
+                    <a href="/stop_schedule/{{ schedule.id }}" class="btn btn-danger">Stop</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
