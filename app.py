@@ -28,7 +28,11 @@ class Schedule(db.Model):
     end_time = db.Column(db.String(20), nullable=True)  # HH:MM:SS format
     days = db.Column(db.String(50), nullable=False)  # Comma-separated days
 
+<<<<<<< Updated upstream
 # Initialize the database
+=======
+# Database initialization at app startup
+>>>>>>> Stashed changes
 with app.app_context():
     if not os.path.exists('schedules.db'):
         db.create_all()
@@ -102,6 +106,7 @@ class VLCController:
             logging.info("VLC process terminated.")
 
     def play(self):
+<<<<<<< Updated upstream
         """Send play command to VLC if media is loaded."""
         try:
             if not self.is_playing:
@@ -119,6 +124,17 @@ class VLCController:
         except Exception as e:
             logging.error(f"Error stopping media: {e}")
             self.close()
+=======
+        """Play the currently loaded media."""
+        if not self.is_playing:
+            self.send_command("play")
+            self.is_playing = True
+
+    def stop(self):
+        """Stop playback of the current media."""
+        self.send_command("stop")
+        self.is_playing = False
+>>>>>>> Stashed changes
 
     def add_to_playlist(self, media_path):
         """Add a media file to VLC's playlist."""
@@ -165,8 +181,15 @@ def play_music(music_folder):
         else:
             vlc.add_to_playlist(music_to_play)
 
+<<<<<<< Updated upstream
         time.sleep(2)
         if vlc.sock:
+=======
+    time.sleep(2)
+
+    if vlc.sock:
+        try:
+>>>>>>> Stashed changes
             vlc.play()
             vlc.set_volume(100)
     except Exception as e:
@@ -201,6 +224,7 @@ def convert_days_to_ap_scheduler_format(days):
         return []
 
 def load_schedules_from_db():
+<<<<<<< Updated upstream
     """Load schedule entries from the database."""
     try:
         with app.app_context():
@@ -243,12 +267,52 @@ def schedule_music(job):
     except Exception as e:
         logging.error(f"Error scheduling music: {e}")
         vlc.close()
+=======
+    """Load schedules from the database with app context."""
+    with app.app_context():
+        schedules = Schedule.query.all()
+        return [
+            {
+                'play_music_folder': schedule.play_music_folder,
+                'start_time': schedule.start_time,
+                'end_time': schedule.end_time.split('.')[0] if schedule.end_time else None,
+                'days': schedule.days.split(',')
+            }
+            for schedule in schedules
+        ]
+
+def schedule_music(job):
+    """Play music if the current day matches the job's specified days."""
+    current_day = datetime.now().strftime("%A")
+    if current_day in job['days']:
+        try:
+            logging.info(f"Playing scheduled music for {current_day}")
+            play_music(job['play_music_folder'])
+        except Exception as e:
+            logging.error(f"Failed to schedule music: {e}")
+
+    if job['end_time']:
+        end_time = datetime.strptime(job['end_time'], '%H:%M:%S').time()
+        current_time = datetime.now().time()
+        if current_time < end_time:
+            days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
+            if days_for_scheduler:
+                stop_id = f"stop_{job['start_time']}_{'_'.join(job['days'])}_{random.randint(1000, 9999)}"
+                scheduler.add_job(
+                    stop_music, 'cron', 
+                    day_of_week=','.join(days_for_scheduler), 
+                    hour=end_time.hour, 
+                    minute=end_time.minute, 
+                    id=stop_id
+                )
+>>>>>>> Stashed changes
 
 def main():
     """Main function to initialize VLC controller, load schedules, and start scheduler."""
     global vlc, scheduler
     vlc = VLCController()
     scheduler = BackgroundScheduler()
+<<<<<<< Updated upstream
 
     try:
         vlc.start_vlc()
@@ -275,6 +339,28 @@ def main():
 
         scheduler.start()
 
+=======
+
+    with app.app_context():
+        schedule_data = load_schedules_from_db()
+
+    for job in schedule_data:
+        days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
+        if days_for_scheduler:
+            job_id = f"{job['start_time']}_{'_'.join(job['days'])}_{random.randint(1000, 9999)}"
+            scheduler.add_job(
+                schedule_music, 'cron', 
+                day_of_week=','.join(days_for_scheduler), 
+                hour=int(job['start_time'].split(':')[0]), 
+                minute=int(job['start_time'].split(':')[1]),
+                args=[job],
+                id=job_id
+            )
+
+    scheduler.start()
+
+    try:
+>>>>>>> Stashed changes
         while True:
             time.sleep(1)
     except (KeyboardInterrupt, SystemExit):
