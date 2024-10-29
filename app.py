@@ -275,7 +275,7 @@ def edit_schedule():
     start_time = request.form['start_time']
     end_time = request.form['end_time']
     days = request.form.getlist('days')
-    
+
     # Find the schedule by ID and update its fields
     schedule = Schedule.query.get(schedule_id)
     if schedule:
@@ -283,16 +283,24 @@ def edit_schedule():
         schedule.start_time = start_time
         schedule.end_time = end_time
         schedule.days = ','.join(days)
-        
+
         db.session.commit()
         logging.info(f"Updated schedule ID: {schedule_id} with new values.")
 
-        # Re-schedule jobs after editing
-        scheduler.remove_job(f"{schedule.start_time}_{schedule.days.replace(',', '_')}")
-        scheduler.add_job(schedule_music, 'cron', 
+        job_id = f"{schedule.start_time}_{schedule.days.replace(',', '_')}"
+
+        # Check if the job exists before trying to remove it
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+            logging.info(f"Removed job with ID: {job_id}")
+        else:
+            logging.warning(f"Job with ID: {job_id} not found, cannot remove.")
+
+        # Add new job with updated schedule
+        scheduler.add_job(schedule_music, 'cron',
                           day_of_week=convert_days_to_ap_scheduler_format(days),
-                          hour=int(start_time.split(":")[0]), 
-                          minute=int(start_time.split(":")[1]), 
+                          hour=int(start_time.split(":")[0]),
+                          minute=int(start_time.split(":")[1]),
                           args=[{
                               'id': schedule.id,
                               'play_music_folder': play_music_folder,
@@ -300,12 +308,13 @@ def edit_schedule():
                               'end_time': end_time,
                               'days': days
                           }],
-                          id=f"{start_time}_{','.join(days).replace(',', '_')}")  # Unique ID based on time and days
+                          id=job_id)  # Unique ID based on time and days
 
         return redirect(url_for('index'))
     else:
         logging.warning(f"Schedule ID not found: {schedule_id}")
         return redirect(url_for('index'))
+
     
 @app.route('/stop_schedule/<int:schedule_id>')
 def stop_schedule(schedule_id):
