@@ -10,8 +10,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import logging
 from flask import Flask, request, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from device_controller import load_device_config, initialize_devices
 import tinytuya
-import json
+
 
 
 # Set up logging
@@ -22,12 +23,6 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schedules.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-
-# Load device configuration from JSON file
-def load_device_config():
-    with open(r'C:\Users\admin\OneDrive - DePaul University\OOP\Desktop(1)\Python\python\Project\flask\RC control way\config.json', 'r') as file:
-        return json.load(file)
 
 # Initialize devices from configuration
 device_config = load_device_config()
@@ -119,6 +114,10 @@ class VLCController:
             try:
                 self.sock.sendall(bytes(command + '\n', "utf-8"))
                 logging.info(f"Sent command: {command}")
+                response = self.sock.recv(1024)  # Adjust buffer size if necessary
+                logging.info(f"VLC response: {response.decode('utf-8')}")
+            except socket.error as e:
+                logging.error(f"Socket error when sending command: {e}")
             except Exception as e:
                 logging.error(f"Error sending command: {e}")
 
@@ -137,11 +136,13 @@ class VLCController:
         if not self.is_playing:
             self.send_command("play")
             self.is_playing = True  # Set playing status
-
-    def stop(self):
-        """Stop playback of the current media."""
-        self.send_command("stop")
-        self.is_playing = False  # Reset playing status
+    def stop_music():
+        """Stop the music playback only if it's currently playing."""
+        if vlc.is_playing:
+            vlc.stop()
+            logging.info("Music playback stopped.")
+        else:
+            logging.info("No music is currently playing to stop.")
 
     def add_to_playlist(self, media_path):
         """Add media to the VLC playlist."""
@@ -159,10 +160,13 @@ def normalize_path(path):
     return os.path.normpath(path)
 
 
-def stop_music():
-    """Stop the music playback."""
-    vlc.stop()
-    logging.info("Music playback stopped.")
+def stop_music1():
+    """Stop the music playback only if it's currently playing."""
+    if vlc.is_playing:
+        vlc.stop()
+        logging.info("Music playback stopped.")
+    else:
+        logging.info("No music is currently playing to stop.")
 
 def convert_days_to_ap_scheduler_format(days):
     """Convert day names to APScheduler format."""
@@ -199,6 +203,8 @@ def play_music(media_folder):
         vlc.start_vlc()
 
     media_files = glob.glob(os.path.join(media_folder, '*'))
+    logging.info(f"Media files found: {media_files}")
+    
     if media_files:
         selected_media = random.choice(media_files)
         vlc.add_to_playlist(selected_media)
@@ -284,7 +290,7 @@ def main():
 def index():
     """Render the main page with scheduled music."""
     schedules = load_schedules_from_db()
-    return render_template('index.html', schedules=schedules,devices=devices, range=range(len(devices)))
+    return render_template('index.html', schedules=schedules,devices=devices, ranges=range(len(devices)))
 
 @app.route('/add_schedule', methods=['POST'])
 def add_schedule():

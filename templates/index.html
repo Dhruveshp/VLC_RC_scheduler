@@ -38,7 +38,7 @@
                     <td>{{ schedule.end_time }}</td>
                     <td>{{ schedule.days }}</td>
                     <td>
-                        <a href="/stop_schedule/{{ schedule.id }}" class="btn btn-danger">Stop</a>
+                        <a href="/stop_schedule/{{ schedule.id }}" class="btn btn-danger">Delete</a>
                         <button class="btn btn-warning" data-toggle="modal" data-target="#editModal" 
                                 data-id="{{ schedule.id }}" 
                                 data-music-folder="{{ schedule.play_music_folder }}" 
@@ -169,7 +169,7 @@
             </div>
             <div class="modal-body">
                 <div id="all_devices">
-                    {% for index in range %}
+                    {% for index in ranges %}
                         <h2>Device {{ index + 1 }}</h2>
                         <button class="btn btn-primary turn-on" data-index="{{ index }}">Turn On</button>
                         <button class="btn btn-secondary turn-off" data-index="{{ index }}">Turn Off</button>
