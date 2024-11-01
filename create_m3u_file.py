@@ -1,6 +1,11 @@
 import os
+import logging
 
-def create_m3u(directory, output_file='playlist.m3u'):
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def create_m3u(directory, output_file_name):
+    output_file= output_file_name+'.m3u'
     with open(output_file, 'w') as f:
         # Write the M3U header
         f.write('#EXTM3U\n')
@@ -12,9 +17,6 @@ def create_m3u(directory, output_file='playlist.m3u'):
                 f.write(f'#EXTINF:-1,{filename}\n')  # Use the filename as title
                 f.write(f'{file_path}\n')
 
-    print(f'M3U playlist created: {output_file}')
+    logging.info(f'M3U playlist created: {output_file}')  # Log the message
+    return os.path.abspath(output_file)  # Return the absolute path of the created file
 
-# Example usage:
-if __name__ == "__main__":
-    path = r"C:\Users\admin\OneDrive - DePaul University\OOP\Desktop(1)\mp3\08. Thal Manasi"
-    create_m3u(path)

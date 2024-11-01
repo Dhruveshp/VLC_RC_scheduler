@@ -12,6 +12,8 @@ from flask import Flask, request, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from device_controller import load_device_config, initialize_devices
 import tinytuya
+from create_m3u_file import create_m3u
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,7 +55,7 @@ class Schedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     play_music_folder = db.Column(db.String(200), nullable=False)
     start_time = db.Column(db.String(5), nullable=False)  # HH:MM format
-    end_time = db.Column(db.String(20), nullable=True)  # HH:MM:SS format
+    end_time = db.Column(db.String(5), nullable=True)  # HH:MM format
     days = db.Column(db.String(50), nullable=False)  # Comma-separated days
 
 # Create the database and the schedule table if it doesn't exist
@@ -189,9 +191,10 @@ def play_music(media_folder):
 
     media_files = glob.glob(os.path.join(media_folder, '*'))
     logging.info(f"Media files found: {media_files}")
-
-    if media_files:
-        selected_media = media_files[0]  # Get the first media file
+    play_list_name = os.path.basename(media_folder) or 'playlist1'
+    m3u_file = create_m3u(media_folder,play_list_name)
+    if m3u_file:
+        selected_media = m3u_file  # Get the first media file
         logging.info(f"Selected media for playback: {selected_media}")
         vlc.send_command(f"add {selected_media}")  # Use the 'add' command to queue the file
         vlc.play()
@@ -207,6 +210,7 @@ def schedule_music(job):
     """Schedule music playback based on the provided job details."""
     current_day = datetime.now().strftime("%A")
     current_time = datetime.now().strftime("%H:%M")
+    logging.info(f"Function called for job: {job}")
     logging.info(f"Current day: {current_day}, Current time: {current_time}")
 
     if current_day in job['days']:
@@ -223,7 +227,7 @@ def schedule_music(job):
             try:
                 end_time = datetime.strptime(job['end_time'], '%H:%M').time()
             except ValueError:
-                end_time = datetime.strptime(job['end_time'], '%H:%M:%S').time()
+                end_time = datetime.strptime(job['end_time'], '%H:%M').time()
 
             if current_time < end_time.strftime("%H:%M"):
                 days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
@@ -235,10 +239,12 @@ def schedule_music(job):
                                           hour=end_time.hour,
                                           minute=end_time.minute,
                                           id=stop_job_id)
+                        logging.info(f"Scheduled stop job: {stop_job_id} for {end_time.strftime('%H:%M')}")
                     else:
                         logging.warning(f"Stop job {stop_job_id} is already scheduled.")
                 else:
                     logging.warning("No valid days to schedule stop_music job.")
+
 
 def main():
     """Main entry point of the application."""
@@ -255,7 +261,7 @@ def main():
 
     for job in schedule_data:
         job['play_music_folder'] = normalize_path(job['play_music_folder'])
-
+        
         days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
         if days_for_scheduler:
             job_id = f"{job['start_time']}_{'_'.join(job['days'])}"
