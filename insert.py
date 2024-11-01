@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # Example usage
     insert_schedule(
         'C:/Users/admin/OneDrive - DePaul University/OOP/Desktop(1)/mp3/02. Prabhatiya', 
-        '12:29', 
-        '12:30', 
-        ['Monday', 'Wednesday', 'Tuesday']
+        '15:25', 
+        '15:30', 
+        ['Monday', 'Wednesday', 'Thursday']
     )

@@ -31,10 +31,9 @@ for device in device_config['devices']:
         dev_id=device['dev_id'],
         address=device['address'],
         local_key=device['local_key'],
-        version=device['version']  # Use the version from the config
+        version=device['version']
     )
     devices.append(d)
-
 
 # Routes for controlling the TinyTuya devices
 @app.route('/turn_on/<int:device_index>')
@@ -48,7 +47,6 @@ def turn_off(device_index):
     """Turn off the specified device."""
     devices[device_index].turn_off()
     return redirect(url_for('index'))
-
 
 # Define the Schedule model
 class Schedule(db.Model):
@@ -69,7 +67,7 @@ class VLCController:
         self.port = port
         self.sock = None
         self.vlc_process = None
-        self.is_playing = False  # Track playback status
+        self.is_playing = False
 
     def is_vlc_running(self):
         """Check if VLC is already running."""
@@ -85,7 +83,7 @@ class VLCController:
             r"C:\Program Files\VideoLAN\VLC\vlc.exe",
             "--intf", "rc",
             "--rc-host", f"{self.host}:{self.port}",
-            "--verbose", "2"  # Increase verbosity for debugging
+            "--verbose", "2"
         ]
         if media_path:
             vlc_command.append(media_path)
@@ -93,7 +91,7 @@ class VLCController:
         logging.info(f"Starting VLC with command: {vlc_command}")
         self.vlc_process = subprocess.Popen(vlc_command)
         logging.info("VLC started with RC interface.")
-        time.sleep(2)  # Increased delay to ensure VLC is ready to receive commands
+        time.sleep(2)
 
         self.connect()
 
@@ -112,7 +110,7 @@ class VLCController:
             try:
                 self.sock.sendall(bytes(command + '\n', "utf-8"))
                 logging.info(f"Sent command: {command}")
-                response = self.sock.recv(1024)  # Adjust buffer size if necessary
+                response = self.sock.recv(1024)
                 logging.info(f"VLC response: {response.decode('utf-8')}")
             except socket.error as e:
                 logging.error(f"Socket error when sending command: {e}")
@@ -133,7 +131,7 @@ class VLCController:
         """Play the currently loaded media."""
         if not self.is_playing:
             self.send_command("play")
-            self.is_playing = True  # Set playing status
+            self.is_playing = True
 
     def stop(self):
         """Stop the music playback only if it's currently playing."""
@@ -143,10 +141,6 @@ class VLCController:
             self.is_playing = False
         else:
             logging.info("No music is currently playing to stop.")
-
-    def add_to_playlist(self, media_path):
-        """Add media to the VLC playlist."""
-        self.send_command(f"add {media_path}")
 
     def set_volume(self, volume):
         """Set the volume to a specific level."""
@@ -171,7 +165,7 @@ def convert_days_to_ap_scheduler_format(days):
         "Sunday": "sun"
     }
     converted_days = [day_map[day.strip()] for day in days if day.strip() in day_map]
-    logging.info(f"Converted days: {converted_days}")  # Log converted days
+    logging.info(f"Converted days: {converted_days}")
     return ','.join(converted_days) if converted_days else None
 
 def load_schedules_from_db():
@@ -182,14 +176,14 @@ def load_schedules_from_db():
             'id': schedule.id,
             'play_music_folder': schedule.play_music_folder,
             'start_time': schedule.start_time,
-            'end_time': schedule.end_time.split('.')[0] if schedule.end_time else None,  # Remove microseconds
-            'days': schedule.days.split(',')  # Convert to a list of days
+            'end_time': schedule.end_time.split('.')[0] if schedule.end_time else None,
+            'days': schedule.days.split(',')
         }
         for schedule in schedules
     ]
 
 def play_music(media_folder):
-    """Play music from the specified folder."""
+    """Play the first media file from the specified folder."""
     if not vlc.is_vlc_running():
         vlc.start_vlc()
 
@@ -197,18 +191,22 @@ def play_music(media_folder):
     logging.info(f"Media files found: {media_files}")
 
     if media_files:
-        selected_media = random.choice(media_files)
+        selected_media = media_files[0]  # Get the first media file
         logging.info(f"Selected media for playback: {selected_media}")
-        vlc.add_to_playlist(selected_media)
+        vlc.send_command(f"add {selected_media}")  # Use the 'add' command to queue the file
         vlc.play()
         logging.info(f"Playing music: {selected_media}")
     else:
         logging.warning(f"No media files found in folder: {media_folder}")
 
+def stop_music():
+    """Stop music playback when scheduled."""
+    vlc.stop()
+
 def schedule_music(job):
     """Schedule music playback based on the provided job details."""
     current_day = datetime.now().strftime("%A")
-    current_time = datetime.now().strftime("%H:%M")  # Get current time in HH:MM format
+    current_time = datetime.now().strftime("%H:%M")
     logging.info(f"Current day: {current_day}, Current time: {current_time}")
 
     if current_day in job['days']:
@@ -222,14 +220,15 @@ def schedule_music(job):
             logging.info(f"Not the right time to play music. Current: {current_time}, Scheduled: {job['start_time']}")
 
         if job['end_time']:
-            end_time_str = job['end_time'].split('.')[0]  # Take only 'HH:MM:SS'
-            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+            try:
+                end_time = datetime.strptime(job['end_time'], '%H:%M').time()
+            except ValueError:
+                end_time = datetime.strptime(job['end_time'], '%H:%M:%S').time()
 
             if current_time < end_time.strftime("%H:%M"):
                 days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
                 if days_for_scheduler:
                     stop_job_id = f"stop_{job['start_time']}_{'_'.join(job['days'])}"
-                    # Ensure the stop job is not already scheduled
                     if not scheduler.get_job(stop_job_id):
                         scheduler.add_job(stop_music, 'cron',
                                           day_of_week=days_for_scheduler,
@@ -255,18 +254,17 @@ def main():
     schedule_data = load_schedules_from_db()
 
     for job in schedule_data:
-        # Normalize the music folder path from the job
         job['play_music_folder'] = normalize_path(job['play_music_folder'])
 
         days_for_scheduler = convert_days_to_ap_scheduler_format(job['days'])
-        if days_for_scheduler:  # Ensure that this is not empty
-            job_id = f"{job['start_time']}_{'_'.join(job['days'])}"  # Create a unique ID based on time and days
+        if days_for_scheduler:
+            job_id = f"{job['start_time']}_{'_'.join(job['days'])}"
             scheduler.add_job(schedule_music, 'cron', 
                               day_of_week=days_for_scheduler, 
                               hour=int(job['start_time'].split(':')[0]), 
                               minute=int(job['start_time'].split(':')[1]),
                               args=[job],
-                              id=job_id)  # Use the generated ID
+                              id=job_id)
             logging.info(f"Added job: {job_id} for music folder {job['play_music_folder']} at {job['start_time']} on days {job['days']}")
         else:
             logging.warning(f"No valid days for scheduling job: {job}")
@@ -292,16 +290,15 @@ def index():
 @app.route('/add_schedule', methods=['POST'])
 def add_schedule():
     """Add a new schedule to the database."""
-    play_music_folder = request.form.get('play_music_folder')  # Use .get() to avoid KeyError
+    play_music_folder = request.form.get('play_music_folder')
     start_time = request.form.get('start_time')
     end_time = request.form.get('end_time')
     days = request.form.getlist('days')
 
-    if not play_music_folder or not start_time:  # Validate the essential fields
+    if not play_music_folder or not start_time:
         logging.error("Missing required fields.")
         return redirect(url_for('index'))
 
-    # Join the list of days into a comma-separated string
     days_str = ','.join(days)
 
     new_schedule = Schedule(
@@ -326,7 +323,6 @@ def edit_schedule():
     end_time = request.form['end_time']
     days = request.form.getlist('days')
 
-    # Find the schedule by ID and update its fields
     schedule = Schedule.query.get(schedule_id)
     if schedule:
         schedule.play_music_folder = play_music_folder
@@ -339,14 +335,10 @@ def edit_schedule():
 
         job_id = f"{schedule.start_time}_{schedule.days.replace(',', '_')}"
 
-        # Check if the job exists before trying to remove it
         if scheduler.get_job(job_id):
             scheduler.remove_job(job_id)
             logging.info(f"Removed job with ID: {job_id}")
-        else:
-            logging.warning(f"Job with ID: {job_id} not found, cannot remove.")
 
-        # Add new job with updated schedule
         scheduler.add_job(schedule_music, 'cron',
                           day_of_week=convert_days_to_ap_scheduler_format(days),
                           hour=int(start_time.split(":")[0]),
@@ -358,7 +350,7 @@ def edit_schedule():
                               'end_time': end_time,
                               'days': days
                           }],
-                          id=job_id)  # Unique ID based on time and days
+                          id=job_id)
 
         return redirect(url_for('index'))
     else:
@@ -370,8 +362,6 @@ def stop_schedule(schedule_id):
     """Stop a scheduled music playback by schedule ID."""
     schedule = Schedule.query.get(schedule_id)
     if schedule:
-        # Stop the music if it's currently playing
-        vlc.stop()
         db.session.delete(schedule)
         db.session.commit()
         logging.info(f"Stopped and deleted schedule ID: {schedule_id}")
